@@ -1,8 +1,10 @@
 package com.justagod.opengles20game;
 
-import org.junit.Test;
+import com.justagod.opengles20game.WorldProviding.Vectors.BlockPos;
+import com.justagod.opengles20game.WorldProviding.Vectors.Vector;
 
-import static org.junit.Assert.*;
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
  * Example local unit test, which will execute on the development machine (host).
@@ -11,7 +13,9 @@ import static org.junit.Assert.*;
  */
 public class ExampleUnitTest {
     @Test
-    public void addition_isCorrect() throws Exception {
-        assertEquals(4, 2 + 2);
+    public void testVectorTransformation() {
+        Vector vector = new Vector(-0.1f, 0.2f, 1);
+
+        Assert.assertEquals(new BlockPos(-1, 0, 1), vector.toBlockPos());
     }
 }

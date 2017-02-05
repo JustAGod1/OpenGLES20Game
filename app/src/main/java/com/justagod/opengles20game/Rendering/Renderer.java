@@ -1,29 +1,39 @@
 package com.justagod.opengles20game.Rendering;
 
+import android.content.res.Resources;
 import android.opengl.GLSurfaceView;
-import android.util.Log;
+import android.opengl.Matrix;
 
 import com.justagod.opengles20game.R;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 import static android.opengl.GLES20.GL_COLOR_BUFFER_BIT;
 import static android.opengl.GLES20.GL_DEPTH_BUFFER_BIT;
+import static android.opengl.GLES20.GL_DEPTH_TEST;
 import static android.opengl.GLES20.GL_FLOAT;
-import static android.opengl.GLES20.GL_TRIANGLE_FAN;
+import static android.opengl.GLES20.GL_TEXTURE0;
+import static android.opengl.GLES20.GL_TEXTURE_2D;
+import static android.opengl.GLES20.GL_TRIANGLE_STRIP;
+import static android.opengl.GLES20.glActiveTexture;
+import static android.opengl.GLES20.glBindTexture;
 import static android.opengl.GLES20.glClear;
 import static android.opengl.GLES20.glClearColor;
 import static android.opengl.GLES20.glDrawArrays;
+import static android.opengl.GLES20.glEnable;
+import static android.opengl.GLES20.glEnableVertexAttribArray;
 import static android.opengl.GLES20.glGetAttribLocation;
-import static android.opengl.GLES20.glGetProgramInfoLog;
 import static android.opengl.GLES20.glGetUniformLocation;
+import static android.opengl.GLES20.glUniform1i;
+import static android.opengl.GLES20.glUniformMatrix4fv;
+import static android.opengl.GLES20.glUseProgram;
 import static android.opengl.GLES20.glVertexAttribPointer;
-import static com.justagod.opengles20game.Rendering.Tesselator.bindProgram;
-import static com.justagod.opengles20game.Rendering.Tesselator.compileFragmentShader;
-import static com.justagod.opengles20game.Rendering.Tesselator.compileVertexShader;
-import static com.justagod.opengles20game.Rendering.Tesselator.createProgram;
-import static com.justagod.opengles20game.Rendering.Tesselator.readTextFileFromResources;
+import static android.opengl.GLES20.glViewport;
 
 
 /**
@@ -36,59 +46,159 @@ import static com.justagod.opengles20game.Rendering.Tesselator.readTextFileFromR
 
 public class Renderer implements GLSurfaceView.Renderer {
 
-    public static final String U_COLOR = "u_Color";
-    public static final String A_POSITION = "a_Position";
-    public static final String TAG = "Renderer";
+    private final static int POSITION_COUNT = 3;
+    private static final int TEXTURE_COUNT = 2;
+    private static final int STRIDE = (POSITION_COUNT
+            + TEXTURE_COUNT) * 4;
 
-    public int uColorLocation;
-    public int aPositionLocation;
+
+    private FloatBuffer vertexData;
+
+
+    private int aPositionLocation;
+    private int aTextureLocation;
+    private int uTextureUnitLocation;
+    private int uMatrixLocation;
+
+    private int programId;
+
+    private float[] mProjectionMatrix = new float[16];
+    private float[] mViewMatrix = new float[16];
+    private float[] mMatrix = new float[16];
+
+    private int texture;
+    private Resources resources;
+
+    public Renderer(Resources resources) {
+        this.resources = resources;
+    }
 
 
     @Override
-    public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-        glClearColor(1, 0, 0, 1);
+    public void onSurfaceCreated(GL10 arg0, EGLConfig arg1) {
+        Tesselator.init(resources);
 
-        String vertexShaderCode = readTextFileFromResources(R.raw.vertex_shader);
-        System.out.println(vertexShaderCode);
-        System.out.println("--------------------------------------");
-        int vertexShader = compileVertexShader(vertexShaderCode);
-        String fragmentShaderCode = readTextFileFromResources(R.raw.fragment_shader);
-        System.out.println(fragmentShaderCode);
-        int fragmentShader = compileFragmentShader(fragmentShaderCode);
+        glClearColor(0f, 0f, 0f, 1f);
+        glEnable(GL_DEPTH_TEST);
 
-        int program = createProgram(vertexShader, fragmentShader);
+        createAndUseProgram();
+        getLocations();
+        prepareData();
+        bindData();
+        createViewMatrix();
 
-        bindProgram(program);
-
-
-
-        uColorLocation = glGetUniformLocation(program, U_COLOR);
-        aPositionLocation = glGetAttribLocation(program, A_POSITION);
-
-        Tesselator.validateProgram(program);
-
-        Log.v(TAG, glGetProgramInfoLog(program));
     }
 
     @Override
-    public void onSurfaceChanged(GL10 gl, int width, int height) {
-
+    public void onSurfaceChanged(GL10 arg0, int width, int height) {
+        glViewport(0, 0, width, height);
+        createProjectionMatrix(width, height);
+        bindMatrix();
     }
 
-    @Override
-    public void onDrawFrame(GL10 gl) {
-        glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
+    private void prepareData() {
 
         float[] vertices = {
-                -1, -1, 0,
-                1, -1, 0,
-                1, 1, 0,
-                -1, 1, 0
+                -1,  1, 1,   0, 0,
+                -1, -1, 1,   0, 1,
+                1,  1, 1,   1, 0,
+                1, -1, 1,   1, 1,
         };
 
-        glVertexAttribPointer(aPositionLocation, vertices.length, GL_FLOAT, false, 0, Tesselator.createFloatBuffer(vertices));
+        vertexData = ByteBuffer
+                .allocateDirect(vertices.length * 4)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer();
+        vertexData.put(vertices);
+
+        texture = Tesselator.loadTexture(R.drawable.brick);
+    }
+
+    private void createAndUseProgram() {
+        int vertexShaderId = Tesselator.compileVertexShader(R.raw.vertex_shader);
+        int fragmentShaderId = Tesselator.compileFragmentShader(R.raw.fragment_shader);
+        programId = Tesselator.createProgram(vertexShaderId, fragmentShaderId);
+        glUseProgram(programId);
+    }
+
+    private void getLocations() {
+        aPositionLocation = glGetAttribLocation(programId, "a_Position");
+        aTextureLocation = glGetAttribLocation(programId, "a_Texture");
+        uTextureUnitLocation = glGetUniformLocation(programId, "u_TextureUnit");
+        uMatrixLocation = glGetUniformLocation(programId, "u_Matrix");
+    }
+
+    private void bindData() {
+        // координаты вершин
+        vertexData.position(0);
+        glVertexAttribPointer(aPositionLocation, POSITION_COUNT, GL_FLOAT,
+                false, STRIDE, vertexData);
+        glEnableVertexAttribArray(aPositionLocation);
+
+        // координаты текстур
+        vertexData.position(POSITION_COUNT);
+        glVertexAttribPointer(aTextureLocation, TEXTURE_COUNT, GL_FLOAT,
+                false, STRIDE, vertexData);
+        glEnableVertexAttribArray(aTextureLocation);
+
+        // помещаем текстуру в target 2D юнита 0
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
+
+        // юнит текстуры
+        glUniform1i(uTextureUnitLocation, 0);
+    }
+
+    private void createProjectionMatrix(int width, int height) {
+        float ratio = 1;
+        float left = -1;
+        float right = 1;
+        float bottom = -1;
+        float top = 1;
+        float near = 2;
+        float far = 12;
+        if (width > height) {
+            ratio = (float) width / height;
+            left *= ratio;
+            right *= ratio;
+        } else {
+            ratio = (float) height / width;
+            bottom *= ratio;
+            top *= ratio;
+        }
+
+        Matrix.frustumM(mProjectionMatrix, 0, left, right, bottom, top, near, far);
+    }
+
+    private void createViewMatrix() {
+        // точка положения камеры
+        float eyeX = 0;
+        float eyeY = 0;
+        float eyeZ = 7;
+
+        // точка направления камеры
+        float centerX = 0;
+        float centerY = 0;
+        float centerZ = 0;
+
+        // up-вектор
+        float upX = 0;
+        float upY = 1;
+        float upZ = 0;
+
+        Matrix.setLookAtM(mViewMatrix, 0, eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+    }
 
 
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    private void bindMatrix() {
+
+        Matrix.multiplyMM(mMatrix, 0, mProjectionMatrix, 0, mViewMatrix, 0);
+        glUniformMatrix4fv(uMatrixLocation, 1, false, mMatrix, 0);
+    }
+
+    @Override
+    public void onDrawFrame(GL10 arg0) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 }
