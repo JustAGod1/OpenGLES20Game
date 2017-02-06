@@ -20,13 +20,16 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.util.Stack;
 
 import static android.opengl.GLES20.GL_COMPILE_STATUS;
+import static android.opengl.GLES20.GL_FLOAT;
 import static android.opengl.GLES20.GL_FRAGMENT_SHADER;
 import static android.opengl.GLES20.GL_LINK_STATUS;
 import static android.opengl.GLES20.GL_TEXTURE0;
 import static android.opengl.GLES20.GL_TEXTURE_2D;
+import static android.opengl.GLES20.GL_UNSIGNED_INT;
 import static android.opengl.GLES20.GL_VALIDATE_STATUS;
 import static android.opengl.GLES20.GL_VERTEX_SHADER;
 import static android.opengl.GLES20.glActiveTexture;
@@ -55,22 +58,32 @@ import static android.opengl.GLES20.glValidateProgram;
 public class Tesselator {
 
     private static Resources resources;
-    private static int programInUse;
+    private static Program programInUse;
     private static float[] matrix = new float[16];
     private static Stack<float[]> matrixStack = new Stack<>();
 
+    private static boolean verticesBinded;
+    private static boolean colorsBinded;
+    private static boolean textureCoordsBinded;
 
-    private static int defaultVertexShader;
-    private static int defaultFragmentShader;
-    private static int defaultProgram;
+    private static Program defaultProgram;
+
 
 
     public static void init(Resources res) {
         resources = res;
-        defaultVertexShader = compileVertexShader(R.raw.vertex_shader);
-        defaultFragmentShader = compileFragmentShader(R.raw.fragment_shader);
-        defaultProgram = createProgram(defaultVertexShader, defaultFragmentShader);
+        defaultProgram = GLPrograms.createProgram(R.raw.vertex_shader, R.raw.fragment_shader, "u_Matrix", "a_Position", "a_Color", "");
         Matrix.setIdentityM(matrix, 0);
+        useDefaultProgram();
+        setMatrix();
+    }
+
+    public static void setMatrix() {
+        if (programInUse == null) {
+            Logger.e("Програма не привязана!");
+            throw new RuntimeException("Програма не привязана!");
+        }
+        GLES20.glUniformMatrix4fv(programInUse.getMatrixUniformId(), 1, false, matrix, 0);
     }
 
     public static int compileVertexShader(String shaderCode) {
@@ -134,7 +147,7 @@ public class Tesselator {
         return body.toString();
     }
 
-    public static int createProgram(int vertexShader, int fragmentShader) {
+    public static int createProgram(String vertexShader, String fragmentShader) {
         int programId = glCreateProgram();
 
         if (programId == 0) {
@@ -142,8 +155,8 @@ public class Tesselator {
         }
 
 
-        glAttachShader(programId, vertexShader);
-        glAttachShader(programId, fragmentShader);
+        glAttachShader(programId, compileVertexShader(vertexShader));
+        glAttachShader(programId, compileFragmentShader(fragmentShader));
 
         glLinkProgram(programId);
 
@@ -151,15 +164,23 @@ public class Tesselator {
         glGetProgramiv(programId, GL_LINK_STATUS, linkStatus, 0);
 
         if (linkStatus[0] == 0) {
-            Logger.v("Linking of program failed.");
+            Logger.v("Linking of program failed.\n" +
+                    "Log: " + glGetProgramInfoLog(programId));
         }
 
         return programId;
     }
 
-    public static void bindProgram(int programId) {
-        GLES20.glUseProgram(programId);
-        programInUse = programId;
+    public static int createProgram(@RawRes int vertexShader, @RawRes int fragmentShader) {
+        return createProgram(readTextFileFromResources(vertexShader), readTextFileFromResources(fragmentShader));
+    }
+
+    public static void bindProgram(Program program) {
+        program.bind();
+        if (programInUse != null) {
+            programInUse.unBind();
+        }
+        programInUse = program;
     }
 
     public static String readTextFileFromResources(@RawRes int resourceId) {
@@ -180,26 +201,12 @@ public class Tesselator {
     }
 
     public static void useNewDefaultProgram() {
-        bindProgram(createProgram(defaultVertexShader, defaultFragmentShader));
+        bindProgram(GLPrograms.createProgram(R.raw.vertex_shader, R.raw.fragment_shader, "u_Matrix", "a_Position", "", "a_Texture"));
     }
 
-    public static int getAttr(String name) {
-        int res = GLES20.glGetAttribLocation(programInUse, name);
-
-        if (res == -1) Logger.e("Cant find attribute \"" + name + "\"");
-
-        return res;
+    public static Program getProgramInUse() {
+        return programInUse;
     }
-
-    public static int getUniform(String name) {
-        int res = GLES20.glGetUniformLocation(programInUse, name);
-
-        if (res == -1) Logger.e("Cant find uniform \"" + name + "\"");
-
-        return res;
-    }
-
-    //public static int getDefUniform
 
     public static int loadTexture(@DrawableRes int resourceId) {
         final int[] textureIds = new int[1];
@@ -232,5 +239,93 @@ public class Tesselator {
         glBindTexture(GL_TEXTURE_2D, 0);
 
         return textureIds[0];
+    }
+
+    public static void bindVertices(float[] vertices) throws RuntimeException {
+        bindVertices(vertices, 3);
+    }
+
+    public static void bindVertices(float[] vertices, int size) throws RuntimeException {
+        if (programInUse == null) {
+            Logger.e("Програма не привязана!");
+            throw new RuntimeException("Програма не привязана!");
+        }
+        GLES20.glVertexAttribPointer(programInUse.getPositionAttributeId(), size, GL_FLOAT, false, 0, createFloatBuffer(vertices));
+        GLES20.glEnableVertexAttribArray(programInUse.getPositionAttributeId());
+
+        verticesBinded = true;
+    }
+
+    public static void bindColors(float[] colors) {
+        bindColors(colors, 4);
+    }
+
+    public static void bindColors(float[] colors, int size) throws RuntimeException {
+        if (programInUse == null) {
+            Logger.e("Програма не привязана!");
+            throw new RuntimeException("Програма не привязана!");
+        }
+        GLES20.glVertexAttribPointer(programInUse.getColorAttributeId(), size, GL_FLOAT, false, 0, createFloatBuffer(colors));
+        GLES20.glEnableVertexAttribArray(programInUse.getColorAttributeId());
+
+        colorsBinded = true;
+    }
+
+    public static void setColorUniform(float red, float green, float blue, float alpha) {
+        if (programInUse == null) {
+            Logger.e("Програма не привязана");
+            return;
+        }
+        int location = programInUse.getUniform("u_Color");
+
+        GLES20.glUniform4f(location, red, green, blue, alpha);
+    }
+
+    public static void draw(int mode, int[] indices) {
+        if (!colorsBinded) {
+            bindColors(createIndentyColorArray(indices.length));
+            colorsBinded = false;
+        }
+        GLES20.glDrawElements(mode, indices.length, GL_UNSIGNED_INT, createIndicesBuffer(indices));
+    }
+
+    public static void perspective(int width, int height) {
+        float aspect = width / height;
+
+        GLES20.glViewport(0, 0, width, height);
+
+        loadIdentity();
+        Matrix.perspectiveM(matrix, 0, 45, aspect, 0.1f, 100f);
+        setMatrix();
+    }
+
+    public static void loadIdentity() {
+        Matrix.setIdentityM(matrix, 0);
+        setMatrix();
+    }
+
+    private static float[] createIndentyColorArray(int size) {
+        float[] res = new float[size * 4];
+
+        for (int i = 0; i < size * 4; i++) {
+            res[i] = 1;
+        }
+
+        return res;
+    }
+
+    public static IntBuffer createIndicesBuffer(int[] indices) {
+        return (IntBuffer) ByteBuffer
+                .allocateDirect(indices.length * Integer.SIZE / 8)
+                .order(ByteOrder.nativeOrder())
+                .asIntBuffer()
+                .put(indices)
+                .position(0);
+
+    }
+
+    public static void translate(float x, float y, float z) {
+        Matrix.translateM(matrix, 0, x, y, z);
+        setMatrix();
     }
 }

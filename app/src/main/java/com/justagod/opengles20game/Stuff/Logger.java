@@ -48,7 +48,7 @@ public class Logger {
         for (int i = 2; i < trace.length; i++) {
             String res = trace[i].getClassName();
 
-            if (!res.equals(Logger.class.getName())) return res;
+            if (!res.equals(Logger.class.getName())) return res + ":" + trace[i].getMethodName();
         }
 
         throw new RuntimeException("Error while trying find previous class");
@@ -57,5 +57,10 @@ public class Logger {
     public static void v(String msg) {
         if (!ON) return;
         Log.v(getPreviousClassName(), msg);
+    }
+
+    public static void w(String msg) {
+        if (!ON) return;
+        Log.w(getPreviousClassName(), msg);
     }
 }

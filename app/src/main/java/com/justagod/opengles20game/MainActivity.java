@@ -4,6 +4,7 @@ import android.content.pm.ActivityInfo;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -26,7 +27,11 @@ public class MainActivity extends AppCompatActivity {
 
         surface = new GLSurfaceView(this);
         surface.setEGLContextClientVersion(2);
-        surface.setRenderer(new Renderer(getResources()));
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        surface.setRenderer(new Renderer(getResources(), metrics.widthPixels, metrics.heightPixels));
+
+        Tanks.main(new String[] {});
 
         setContentView(surface);
 

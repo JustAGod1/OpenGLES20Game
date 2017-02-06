@@ -36,7 +36,7 @@ public class Program {
     }
 
     void bind() {
-        Tesselator.bindProgram(program);
+        GLES20.glUseProgram(program);
         isBinded = true;
     }
 
@@ -59,7 +59,10 @@ public class Program {
         return GLES20.glGetAttribLocation(program, colorAttr);
     }
 
-
+    public int getTextureCoordAttributeId() {
+        if (!isBinded) Logger.e("Програма не привязана");
+        return GLES20.glGetAttribLocation(program, textureCoordAttr);
+    }
 
     public String getMatrixUniform() {
         return matrixUniform;
@@ -95,5 +98,9 @@ public class Program {
     public Program setTextureCoordAttr(String textureCoordAttr) {
         this.textureCoordAttr = textureCoordAttr;
         return this;
+    }
+
+    public int getUniform(String name) {
+        return GLES20.glGetUniformLocation(program, name);
     }
 }

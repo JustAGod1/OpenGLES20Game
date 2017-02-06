@@ -8,9 +8,20 @@ package com.justagod.opengles20game.WorldProviding.Vectors;
  * =====================================================
  */
 
-public class ChunkPos extends BlockPos {
+public class ChunkPos {
 
-    public ChunkPos(int x, int y, int z) {
-        super(x, y, z);
+    private BlockPos position;
+
+    public ChunkPos(int x, int z) {
+        position = new BlockPos(x, 0, z);
+    }
+
+
+    public int getX() {
+        return position.getX();
+    }
+
+    public int getZ() {
+        return position.getZ();
     }
 }

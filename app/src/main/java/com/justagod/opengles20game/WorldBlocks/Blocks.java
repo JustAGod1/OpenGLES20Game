@@ -9,4 +9,6 @@ package com.justagod.opengles20game.WorldBlocks;
  */
 
 public class Blocks {
+
+    public static final Block bedrock = new Block();
 }
