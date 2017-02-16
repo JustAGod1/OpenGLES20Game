@@ -12,8 +12,8 @@ public class ChunkPos {
 
     private BlockPos position;
 
-    public ChunkPos(int x, int z) {
-        position = new BlockPos(x, 0, z);
+    public ChunkPos(int x, int y) {
+        position = new BlockPos(x, y);
     }
 
 
@@ -21,7 +21,7 @@ public class ChunkPos {
         return position.getX();
     }
 
-    public int getZ() {
-        return position.getZ();
+    public int getY() {
+        return position.getY();
     }
 }

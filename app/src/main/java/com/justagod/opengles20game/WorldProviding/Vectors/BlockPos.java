@@ -11,12 +11,10 @@ package com.justagod.opengles20game.WorldProviding.Vectors;
 public class BlockPos {
     private int x;
     private int y;
-    private int z;
 
-    public BlockPos(int x, int y, int z) {
+    public BlockPos(int x, int y) {
         this.x = x;
         this.y = y;
-        this.z = z;
     }
 
     public int getX() {
@@ -27,9 +25,6 @@ public class BlockPos {
         return y;
     }
 
-    public int getZ() {
-        return z;
-    }
 
     @Override
     public boolean equals(Object o) {
@@ -39,8 +34,7 @@ public class BlockPos {
         BlockPos blockPos = (BlockPos) o;
 
         if (x != blockPos.x) return false;
-        if (y != blockPos.y) return false;
-        return z == blockPos.z;
+        return y == blockPos.y;
 
     }
 
@@ -48,7 +42,6 @@ public class BlockPos {
     public int hashCode() {
         int result = x;
         result = 31 * result + y;
-        result = 31 * result + z;
         return result;
     }
 
@@ -57,7 +50,6 @@ public class BlockPos {
         return "BlockPos{" +
                 "x=" + x +
                 ", y=" + y +
-                ", z=" + z +
                 '}';
     }
 }

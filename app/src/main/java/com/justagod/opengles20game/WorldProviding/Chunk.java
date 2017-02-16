@@ -22,8 +22,8 @@ public class Chunk {
 
     public void generate(ChunkPos pos) {
         for (int i = pos.getX() * 50; i < pos.getX() * 50 + 50; i++) {
-            for (int j = pos.getZ() * 50; j < pos.getZ() * 50 + 50; j++) {
-                BlockPos blockPos = new BlockPos(i, -20, j);
+            for (int j = pos.getY() * 50; j < pos.getY() * 50 + 50; j++) {
+                BlockPos blockPos = new BlockPos(i, j);
                 blocks.put(blockPos, Blocks.bedrock.createWrapper(blockPos));
             }
         }
